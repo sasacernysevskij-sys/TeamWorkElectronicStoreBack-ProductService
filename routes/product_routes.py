@@ -1,12 +1,12 @@
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Header, HTTPException
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
 from db import get_db
-from middleware.auth_middleware import get_current_user, get_current_admin_user
+from services.auth_client import verify_admin
 from services.product_service import ProductService
 
 
@@ -36,6 +36,16 @@ class ProductUpdateRequest(BaseModel):
     image_url: Optional[str] = None
 
 
+def check_admin(authorization: str = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Токен отсутствует")
+    token = authorization.split(" ")[1]
+    admin = verify_admin(token)
+    if not admin:
+        raise HTTPException(status_code=403, detail="Доступ только для админа")
+    return admin
+
+
 @router.get("")
 def get_products(
     product_type: Optional[str] = Query(default=None),
@@ -59,7 +69,7 @@ def get_products(
 @router.post("")
 def create_product(
     data: ProductCreateRequest,
-    current_admin=Depends(get_current_admin_user),
+    admin=Depends(check_admin),
     db: Session = Depends(get_db)
 ):
     result, status_code = product_service.create_product(
@@ -73,18 +83,14 @@ def create_product(
         rating=data.rating,
         image_url=data.image_url
     )
-
-    return JSONResponse(
-        status_code=status_code,
-        content=result
-    )
+    return JSONResponse(status_code=status_code, content=result)
 
 
 @router.put("/{product_id}")
 def update_product(
     product_id: int,
     data: ProductUpdateRequest,
-    current_admin=Depends(get_current_admin_user),
+    admin=Depends(check_admin),
     db: Session = Depends(get_db)
 ):
     result, status_code = product_service.update_product(
@@ -99,33 +105,24 @@ def update_product(
         rating=data.rating,
         image_url=data.image_url
     )
-
-    return JSONResponse(
-        status_code=status_code,
-        content=result
-    )
+    return JSONResponse(status_code=status_code, content=result)
 
 
 @router.delete("/{product_id}")
 def delete_product(
     product_id: int,
-    current_admin=Depends(get_current_admin_user),
+    admin=Depends(check_admin),
     db: Session = Depends(get_db)
 ):
     result, status_code = product_service.delete_product(
         db=db,
         product_id=product_id
     )
-
-    return JSONResponse(
-        status_code=status_code,
-        content=result
-    )
+    return JSONResponse(status_code=status_code, content=result)
 
 
 @router.post("/import")
 def import_products(
-    current_admin=Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
     result, status_code = product_service.import_from_json(db=db)
