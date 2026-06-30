@@ -35,6 +35,8 @@ class ProductUpdateRequest(BaseModel):
     rating: Optional[float] = None
     image_url: Optional[str] = None
 
+class DecreaseStockRequest(BaseModel):
+    quantity: int = Field(gt=0)
 
 def check_admin(authorization: str = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
@@ -65,6 +67,16 @@ def get_products(
     )
     return JSONResponse(status_code=status_code, content=result)
 
+@router.get("/{product_id}")
+def get_product_by_id(
+    product_id: int,
+    db: Session = Depends(get_db)
+):
+    result, status_code = product_service.get_product_by_id(
+        db=db,
+        product_id=product_id
+    )
+    return JSONResponse(status_code=status_code, content=result)
 
 @router.post("")
 def create_product(
@@ -126,4 +138,17 @@ def import_products(
     db: Session = Depends(get_db)
 ):
     result, status_code = product_service.import_from_json(db=db)
+    return JSONResponse(status_code=status_code, content=result)
+
+@router.patch("/{product_id}/decrease-stock")
+def decrease_stock(
+    product_id: int,
+    data: DecreaseStockRequest,
+    db: Session = Depends(get_db)
+):
+    result, status_code = product_service.decrease_stock(
+        db=db,
+        product_id=product_id,
+        quantity=data.quantity
+    )
     return JSONResponse(status_code=status_code, content=result)

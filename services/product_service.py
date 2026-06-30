@@ -213,3 +213,48 @@ class ProductService:
             "imported": imported,
             "skipped": skipped
         }, 201
+
+    def get_product_by_id(self, db, product_id):
+        product = db.query(Product).filter(Product.id == product_id).first()
+
+        if product is None:
+            return {"detail": "Товар не найден"}, 404
+
+        return {
+            "id": product.id,
+            "name": product.name,
+            "article": product.article,
+            "description": product.description,
+            "price": product.price,
+            "product_type": product.product_type,
+            "stock": product.stock,
+            "rating": product.rating,
+            "image_url": product.image_url
+        }, 200
+
+    def decrease_stock(self, db, product_id, quantity):
+        if quantity <= 0:
+            return {"detail": "Количество должно быть больше 0"}, 400
+
+        product = db.query(Product).filter(Product.id == product_id).first()
+
+        if product is None:
+            return {"detail": "Товар не найден"}, 404
+
+        if product.stock < quantity:
+            return {"detail": f"Недостаточно товара на складе: {product.name}"}, 400
+
+        product.stock -= quantity
+
+        db.commit()
+        db.refresh(product)
+
+        return {
+            "message": "Остаток товара обновлён",
+            "product": {
+                "id": product.id,
+                "name": product.name,
+                "article": product.article,
+                "stock": product.stock
+            }
+        }, 200
